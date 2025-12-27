@@ -72,6 +72,22 @@ $latest_health_query = "SELECT * FROM health_data WHERE patient_id = $user_id OR
 $latest_health_result = mysqli_query($connection, $latest_health_query);
 $latest_health = mysqli_fetch_assoc($latest_health_result);
 
+/**
+ * SECTION 4: Assigned Doctors Information
+ * 
+ * Retrieve information about doctors assigned to this patient
+ * for display in the dashboard overview.
+ */
+
+// Get assigned doctors for this patient
+$assigned_doctors_query = "SELECT u.id, u.name, u.email, dp.created_at as assigned_date
+                          FROM users u 
+                          JOIN doctor_patients dp ON u.id = dp.doctor_id 
+                          WHERE dp.patient_id = $user_id AND u.role = 'doctor' AND u.status = 'approved'
+                          ORDER BY dp.created_at DESC";
+$assigned_doctors_result = mysqli_query($connection, $assigned_doctors_query);
+$assigned_doctors_count = mysqli_num_rows($assigned_doctors_result);
+
 // Include page header with navigation and styling
 include '../includes/header.php';
 ?>
@@ -105,13 +121,11 @@ include '../includes/header.php';
             'primary'
         );
         
-        $status_text = $latest_health ? 'Last Updated' : 'No Data';
-        $status_subtitle = $latest_health ? date('M j, g:i A', strtotime($latest_health['created_at'])) : 'Add your first record';
         echo render_data_card(
-            'Health Status',
-            $status_text,
-            $status_subtitle,
-            'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',
+            'Assigned Doctors',
+            $assigned_doctors_count,
+            'Healthcare providers',
+            'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
             'success'
         );
         
@@ -123,12 +137,14 @@ include '../includes/header.php';
             $unread_alerts > 0 ? 'warning' : 'primary'
         );
         
+        $status_text = $latest_health ? 'Last Updated' : 'No Data';
+        $status_subtitle = $latest_health ? date('M j, g:i A', strtotime($latest_health['created_at'])) : 'Add your first record';
         echo render_data_card(
-            'Total Alerts',
-            $total_alerts,
-            'All messages',
-            'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z',
-            'primary'
+            'Health Status',
+            $status_text,
+            $status_subtitle,
+            'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',
+            'success'
         );
         ?>
     </div>
@@ -182,6 +198,87 @@ include '../includes/header.php';
             </div>
         </a>
     </div>
+
+    <!-- Assigned Doctors Section -->
+    <?php if (mysqli_num_rows($assigned_doctors_result) > 0): ?>
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6 animate-fade-in-up stagger-4">
+        <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+            <div class="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mr-2">
+                <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                </svg>
+            </div>
+            Your Healthcare Team
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <?php 
+            mysqli_data_seek($assigned_doctors_result, 0);
+            while ($doctor = mysqli_fetch_assoc($assigned_doctors_result)): 
+            ?>
+            <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-4 border border-blue-200 hover-lift">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-gray-900">Dr. <?php echo htmlspecialchars($doctor['name']); ?></h3>
+                        <p class="text-sm text-gray-600"><?php echo htmlspecialchars($doctor['email']); ?></p>
+                        <p class="text-xs text-blue-600 mt-1">
+                            Assigned: <?php echo date('M j, Y', strtotime($doctor['assigned_date'])); ?>
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-3 flex space-x-2">
+                    <a href="alerts.php?doctor_id=<?php echo $doctor['id']; ?>" 
+                       class="flex-1 text-center bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-md transition-colors">
+                        View Messages
+                    </a>
+                </div>
+            </div>
+            <?php endwhile; ?>
+        </div>
+        
+        <div class="mt-4 p-4 bg-blue-50 rounded-lg">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="text-sm text-blue-800">
+                    <p class="font-medium mb-1">About Your Healthcare Team</p>
+                    <p>These doctors have been assigned to monitor your health and can send you personalized alerts and recommendations. They can view your health data and provide medical guidance based on your readings.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php else: ?>
+    <div class="bg-white rounded-lg shadow-md p-8 text-center mb-6 animate-fade-in-up stagger-4">
+        <div class="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Doctors Assigned Yet</h3>
+        <p class="text-gray-600 mb-4">You haven't been assigned to any doctors yet. Contact your healthcare administrator to get connected with a doctor who can monitor your health.</p>
+        <div class="bg-yellow-50 rounded-lg p-4 text-left">
+            <div class="flex items-start">
+                <svg class="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="text-sm text-yellow-800">
+                    <p class="font-medium mb-1">What happens when you're assigned to a doctor?</p>
+                    <ul class="space-y-1">
+                        <li>• Your doctor can view your health data and trends</li>
+                        <li>• You'll receive personalized health alerts and recommendations</li>
+                        <li>• Your doctor can monitor your progress and provide guidance</li>
+                        <li>• You can communicate through the alert system</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <!-- Recent Health Data -->
     <?php if (mysqli_num_rows($health_result) > 0): ?>

@@ -2,6 +2,12 @@
 require_once '../includes/auth_check.php';
 require_once '../config/db.php';
 
+// Ensure user is admin
+if ($_SESSION['role'] !== 'admin') {
+    header('Location: ../index.php');
+    exit();
+}
+
 // Handle assignment actions
 $message = '';
 $message_type = '';
@@ -47,24 +53,58 @@ if ($_POST) {
 // Get approved doctors
 $doctors_query = "SELECT id, name, email FROM users WHERE role = 'doctor' AND status = 'approved' ORDER BY name";
 $doctors_result = mysqli_query($connection, $doctors_query);
+$doctors_count = mysqli_num_rows($doctors_result);
 
 // Get all patients
 $patients_query = "SELECT id, name, email FROM users WHERE role = 'patient' ORDER BY name";
 $patients_result = mysqli_query($connection, $patients_query);
+$patients_count = mysqli_num_rows($patients_result);
+
+// Debug information
+if ($doctors_count == 0 || $patients_count == 0) {
+    $debug_message = "⚠️ SYSTEM ISSUE DETECTED: ";
+    if ($doctors_count == 0) $debug_message .= "No approved doctors found. ";
+    if ($patients_count == 0) $debug_message .= "No patients found. ";
+    $debug_message .= "Please run the emergency fix script.";
+    $message = $debug_message;
+    $message_type = "error";
+}
+
+// Check if created_at column exists in doctor_patients table
+$check_column_query = "SHOW COLUMNS FROM doctor_patients LIKE 'created_at'";
+$column_check = mysqli_query($connection, $check_column_query);
+$has_created_at = mysqli_num_rows($column_check) > 0;
 
 // Get current assignments with doctor and patient names
-$assignments_query = "SELECT dp.id, dp.created_at,
-                            d.name as doctor_name, d.email as doctor_email,
-                            p.name as patient_name, p.email as patient_email,
-                            COUNT(hd.id) as health_records,
-                            COUNT(a.id) as alerts_sent
-                     FROM doctor_patients dp
-                     JOIN users d ON dp.doctor_id = d.id
-                     JOIN users p ON dp.patient_id = p.id
-                     LEFT JOIN health_data hd ON p.id = hd.patient_id
-                     LEFT JOIN alerts a ON dp.doctor_id = a.doctor_id AND dp.patient_id = a.patient_id
-                     GROUP BY dp.id, dp.created_at, d.name, d.email, p.name, p.email
-                     ORDER BY dp.created_at DESC";
+if ($has_created_at) {
+    $assignments_query = "SELECT dp.id,
+                                d.name as doctor_name, d.email as doctor_email,
+                                p.name as patient_name, p.email as patient_email,
+                                COUNT(hd.id) as health_records,
+                                COUNT(a.id) as alerts_sent,
+                                dp.created_at
+                         FROM doctor_patients dp
+                         JOIN users d ON dp.doctor_id = d.id
+                         JOIN users p ON dp.patient_id = p.id
+                         LEFT JOIN health_data hd ON p.id = hd.patient_id
+                         LEFT JOIN alerts a ON dp.doctor_id = a.doctor_id AND dp.patient_id = a.patient_id
+                         GROUP BY dp.id, dp.created_at, d.name, d.email, p.name, p.email
+                         ORDER BY dp.id DESC";
+} else {
+    $assignments_query = "SELECT dp.id,
+                                d.name as doctor_name, d.email as doctor_email,
+                                p.name as patient_name, p.email as patient_email,
+                                COUNT(hd.id) as health_records,
+                                COUNT(a.id) as alerts_sent,
+                                NULL as created_at
+                         FROM doctor_patients dp
+                         JOIN users d ON dp.doctor_id = d.id
+                         JOIN users p ON dp.patient_id = p.id
+                         LEFT JOIN health_data hd ON p.id = hd.patient_id
+                         LEFT JOIN alerts a ON dp.doctor_id = a.doctor_id AND dp.patient_id = a.patient_id
+                         GROUP BY dp.id, d.name, d.email, p.name, p.email
+                         ORDER BY dp.id DESC";
+}
 $assignments_result = mysqli_query($connection, $assignments_query);
 
 include '../includes/header.php';
@@ -98,13 +138,52 @@ include '../includes/header.php';
     <div class="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 class="text-xl font-semibold text-gray-800 mb-4">Create New Assignment</h2>
         
+        <?php if ($doctors_count == 0 || $patients_count == 0): ?>
+        <!-- Emergency Fix Notice -->
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+            <div class="flex items-start">
+                <svg class="w-6 h-6 text-red-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                </svg>
+                <div>
+                    <h3 class="text-lg font-medium text-red-800 mb-2">🚨 Assignment System Not Ready</h3>
+                    <p class="text-red-700 mb-4">
+                        The assignment system cannot function because:
+                        <?php if ($doctors_count == 0): ?>
+                        <br>• No approved doctors found in the system
+                        <?php endif; ?>
+                        <?php if ($patients_count == 0): ?>
+                        <br>• No patients found in the system
+                        <?php endif; ?>
+                    </p>
+                    <div class="flex space-x-3">
+                        <a href="../emergency_fix.php" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                            🔧 Run Emergency Fix
+                        </a>
+                        <a href="../debug_assignment_system.php" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition-colors">
+                            🔍 Debug System
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <?php else: ?>
+        <!-- Normal Assignment Form -->
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <p class="text-green-800">
+                ✅ System Ready: Found <?php echo $doctors_count; ?> approved doctors and <?php echo $patients_count; ?> patients
+            </p>
+        </div>
+        <?php endif; ?>
+        
         <form method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div>
                 <label for="doctor_id" class="block text-sm font-medium text-gray-700 mb-2">
-                    Select Doctor
+                    Select Doctor (<?php echo $doctors_count; ?> available)
                 </label>
                 <select name="doctor_id" id="doctor_id" required 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <?php echo ($doctors_count == 0) ? 'disabled' : ''; ?>>
                     <option value="">Choose a doctor...</option>
                     <?php 
                     mysqli_data_seek($doctors_result, 0);
@@ -119,10 +198,11 @@ include '../includes/header.php';
             
             <div>
                 <label for="patient_id" class="block text-sm font-medium text-gray-700 mb-2">
-                    Select Patient
+                    Select Patient (<?php echo $patients_count; ?> available)
                 </label>
                 <select name="patient_id" id="patient_id" required 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        <?php echo ($patients_count == 0) ? 'disabled' : ''; ?>>
                     <option value="">Choose a patient...</option>
                     <?php 
                     mysqli_data_seek($patients_result, 0);
@@ -137,7 +217,8 @@ include '../includes/header.php';
             
             <div>
                 <button type="submit" name="assign_patient" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors <?php echo ($doctors_count == 0 || $patients_count == 0) ? 'opacity-50 cursor-not-allowed' : ''; ?>"
+                        <?php echo ($doctors_count == 0 || $patients_count == 0) ? 'disabled' : ''; ?>>
                     Assign Patient
                 </button>
             </div>
@@ -230,10 +311,22 @@ include '../includes/header.php';
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="text-sm text-gray-900">
-                                <?php echo date('M j, Y', strtotime($assignment['created_at'])); ?>
+                                <?php 
+                                if (isset($assignment['created_at']) && $assignment['created_at']) {
+                                    echo date('M j, Y', strtotime($assignment['created_at']));
+                                } else {
+                                    echo 'N/A';
+                                }
+                                ?>
                             </div>
                             <div class="text-sm text-gray-500">
-                                <?php echo date('g:i A', strtotime($assignment['created_at'])); ?>
+                                <?php 
+                                if (isset($assignment['created_at']) && $assignment['created_at']) {
+                                    echo date('g:i A', strtotime($assignment['created_at']));
+                                } else {
+                                    echo 'Unknown time';
+                                }
+                                ?>
                             </div>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">

@@ -251,7 +251,7 @@ include '../includes/header.php';
                         <span class="text-gray-700">Patient Assignments</span>
                     </div>
                     <span class="text-gray-500 text-sm"><?php echo $stats['doctor_patient_assignments']; ?></span>
-                <
+                </a>
             </div>
         </div>
 

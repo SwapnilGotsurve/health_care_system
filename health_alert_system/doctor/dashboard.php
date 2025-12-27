@@ -156,6 +156,113 @@ include '../includes/header.php';
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <!-- Assigned Patients Overview -->
+        <div class="bg-white rounded-lg shadow-md p-6 animate-fade-in-up stagger-4">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <div class="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mr-2">
+                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                Your Assigned Patients (<?php echo $total_patients; ?>)
+            </h2>
+            
+            <?php if ($total_patients > 0): ?>
+                <div class="space-y-3 mb-4">
+                    <?php
+                    // Get a quick overview of assigned patients
+                    $patient_overview_query = "SELECT u.id, u.name, u.email, dp.created_at as assigned_date,
+                                              COUNT(hd.id) as health_records,
+                                              MAX(hd.created_at) as last_health_data
+                                              FROM users u 
+                                              JOIN doctor_patients dp ON u.id = dp.patient_id 
+                                              LEFT JOIN health_data hd ON u.id = hd.patient_id
+                                              WHERE dp.doctor_id = $user_id AND u.role = 'patient'
+                                              GROUP BY u.id, u.name, u.email, dp.created_at
+                                              ORDER BY dp.created_at DESC
+                                              LIMIT 3";
+                    $patient_overview_result = mysqli_query($connection, $patient_overview_query);
+                    
+                    while ($patient = mysqli_fetch_assoc($patient_overview_result)):
+                        $days_since_data = $patient['last_health_data'] ? 
+                            floor((time() - strtotime($patient['last_health_data'])) / (60 * 60 * 24)) : null;
+                        $status_color = $days_since_data === null ? 'gray' : 
+                                       ($days_since_data > 7 ? 'warning' : 
+                                       ($days_since_data > 3 ? 'info' : 'success'));
+                    ?>
+                    <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover-lift">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                                <span class="text-blue-600 font-medium text-sm">
+                                    <?php echo strtoupper(substr($patient['name'], 0, 2)); ?>
+                                </span>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-900"><?php echo htmlspecialchars($patient['name']); ?></p>
+                                <p class="text-sm text-gray-600"><?php echo $patient['health_records']; ?> health records</p>
+                                <p class="text-xs text-gray-500">
+                                    <?php if ($patient['last_health_data']): ?>
+                                        Last data: <?php echo date('M j', strtotime($patient['last_health_data'])); ?>
+                                        <?php if ($days_since_data > 0): ?>
+                                            (<?php echo $days_since_data; ?> days ago)
+                                        <?php endif; ?>
+                                    <?php else: ?>
+                                        No health data yet
+                                    <?php endif; ?>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            <a href="patient_stats.php?patient_id=<?php echo $patient['id']; ?>" 
+                               class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                View
+                            </a>
+                            <a href="send_alert.php?patient_id=<?php echo $patient['id']; ?>" 
+                               class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1 rounded transition-colors">
+                                Alert
+                            </a>
+                        </div>
+                    </div>
+                    <?php endwhile; ?>
+                </div>
+                
+                <div class="text-center">
+                    <a href="patient_list.php" class="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors hover-underline">
+                        View All Patients
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-8">
+                    <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-medium text-gray-900 mb-2">No Patients Assigned</h3>
+                    <p class="text-gray-600 mb-4">You don't have any patients assigned to you yet. Contact your administrator to get patient assignments.</p>
+                    <div class="bg-blue-50 rounded-lg p-4 text-left">
+                        <div class="flex items-start">
+                            <svg class="w-5 h-5 text-blue-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div class="text-sm text-blue-800">
+                                <p class="font-medium mb-1">What you can do with assigned patients:</p>
+                                <ul class="space-y-1">
+                                    <li>• Monitor their health data and trends</li>
+                                    <li>• Send personalized health alerts and recommendations</li>
+                                    <li>• Track their progress over time</li>
+                                    <li>• Provide medical guidance based on their readings</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+        </div>
+
         <!-- Active Patients -->
         <div class="bg-white rounded-lg shadow-md p-6 animate-fade-in-up stagger-4">
             <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
