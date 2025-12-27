@@ -185,13 +185,19 @@ include '../includes/header.php';
                             </div>
                             
                             <?php if ($alert['status'] === 'sent'): ?>
-                                <form method="POST" class="inline">
-                                    <input type="hidden" name="alert_id" value="<?php echo $alert['id']; ?>">
-                                    <button type="submit" name="mark_seen" 
-                                            class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md transition-colors">
-                                        Mark as Read
-                                    </button>
-                                </form>
+                                <button type="button" 
+                                        onclick="markAsRead(<?php echo $alert['id']; ?>)"
+                                        class="mark-read-btn bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm px-4 py-2 rounded-md transition-all duration-200"
+                                        data-alert-id="<?php echo $alert['id']; ?>">
+                                    <span class="btn-text">Mark as Read</span>
+                                    <span class="btn-loading hidden">
+                                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        Processing...
+                                    </span>
+                                </button>
                             <?php else: ?>
                                 <span class="text-sm text-gray-500">
                                     ✓ Read on <?php echo date('M j, Y', strtotime($alert['created_at'])); ?>
@@ -331,15 +337,211 @@ setTimeout(function() {
 }, 300000); // 5 minutes
 <?php endif; ?>
 
-// Smooth scroll to top after marking alert as read
-document.addEventListener('DOMContentLoaded', function() {
-    const forms = document.querySelectorAll('form[method="POST"]');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            setTimeout(() => {
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-            }, 100);
+// Dynamic Mark as Read functionality
+function markAsRead(alertId) {
+    const button = document.querySelector(`[data-alert-id="${alertId}"]`);
+    const alertCard = button.closest('.bg-white');
+    
+    if (!button || !alertCard) return;
+    
+    // Show loading state
+    button.disabled = true;
+    button.querySelector('.btn-text').classList.add('hidden');
+    button.querySelector('.btn-loading').classList.remove('hidden');
+    
+    // Send AJAX request
+    fetch('mark_alert_read.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            alert_id: alertId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update the alert card visually
+            updateAlertCard(alertCard, alertId);
+            
+            // Update the counts in the tabs
+            updateTabCounts(data.unread_count, data.read_count, data.total_count);
+            
+            // Broadcast the change to other tabs/windows
+            localStorage.setItem('alert_marked_read', JSON.stringify({
+                unread_count: data.unread_count,
+                read_count: data.read_count,
+                total_count: data.total_count,
+                timestamp: Date.now()
+            }));
+            
+            // Show success message
+            showNotification('Alert marked as read successfully!', 'success');
+            
+            // If we're on the unread filter and no more unread alerts, show empty state
+            const currentFilter = new URLSearchParams(window.location.search).get('filter');
+            if (currentFilter === 'unread' && data.unread_count === 0) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            }
+        } else {
+            // Show error message
+            showNotification(data.error || 'Failed to mark alert as read', 'error');
+            
+            // Reset button state
+            button.disabled = false;
+            button.querySelector('.btn-text').classList.remove('hidden');
+            button.querySelector('.btn-loading').classList.add('hidden');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('An error occurred. Please try again.', 'error');
+        
+        // Reset button state
+        button.disabled = false;
+        button.querySelector('.btn-text').classList.remove('hidden');
+        button.querySelector('.btn-loading').classList.add('hidden');
+    });
+}
+
+// Update alert card appearance after marking as read
+function updateAlertCard(alertCard, alertId) {
+    // Change border color from blue to gray
+    alertCard.classList.remove('border-blue-500');
+    alertCard.classList.add('border-gray-300');
+    
+    // Update the status indicator dot
+    const statusDot = alertCard.querySelector('.w-3.h-3');
+    if (statusDot) {
+        statusDot.classList.remove('bg-blue-500');
+        statusDot.classList.add('bg-gray-300');
+    }
+    
+    // Update the status badge
+    const statusBadge = alertCard.querySelector('.bg-blue-100');
+    if (statusBadge) {
+        statusBadge.classList.remove('bg-blue-100', 'text-blue-800');
+        statusBadge.classList.add('bg-gray-100', 'text-gray-800');
+        statusBadge.textContent = 'Read';
+    }
+    
+    // Replace the button with read status
+    const button = alertCard.querySelector(`[data-alert-id="${alertId}"]`);
+    if (button) {
+        const currentDate = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
         });
+        button.outerHTML = `<span class="text-sm text-gray-500">✓ Read on ${currentDate}</span>`;
+    }
+}
+
+// Update tab counts
+function updateTabCounts(unreadCount, readCount, totalCount) {
+    // Update All Alerts count
+    const allCountElement = document.querySelector('a[href="?filter=all"] .bg-gray-100');
+    if (allCountElement) {
+        allCountElement.textContent = totalCount;
+    }
+    
+    // Update Unread count
+    const unreadCountElement = document.querySelector('a[href="?filter=unread"] .bg-red-100, a[href="?filter=unread"] .bg-gray-100');
+    if (unreadCountElement) {
+        if (unreadCount > 0) {
+            unreadCountElement.classList.remove('bg-gray-100', 'text-gray-900');
+            unreadCountElement.classList.add('bg-red-100', 'text-red-800');
+        } else {
+            unreadCountElement.classList.remove('bg-red-100', 'text-red-800');
+            unreadCountElement.classList.add('bg-gray-100', 'text-gray-900');
+        }
+        unreadCountElement.textContent = unreadCount;
+    }
+    
+    // Update Read count
+    const readCountElement = document.querySelector('a[href="?filter=read"] .bg-gray-100');
+    if (readCountElement) {
+        readCountElement.textContent = readCount;
+    }
+    
+    // Update header notification badge
+    const headerBadge = document.querySelector('.bg-red-100.text-red-800');
+    if (headerBadge) {
+        if (unreadCount > 0) {
+            headerBadge.textContent = `${unreadCount} new`;
+        } else {
+            headerBadge.remove();
+        }
+    }
+}
+
+// Show notification messages
+function showNotification(message, type = 'success') {
+    // Remove existing notifications
+    const existingNotification = document.querySelector('.notification-toast');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+    
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification-toast fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full`;
+    
+    if (type === 'success') {
+        notification.classList.add('bg-green-500', 'text-white');
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                ${message}
+            </div>
+        `;
+    } else {
+        notification.classList.add('bg-red-500', 'text-white');
+        notification.innerHTML = `
+            <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                ${message}
+            </div>
+        `;
+    }
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Animate in
+    setTimeout(() => {
+        notification.classList.remove('translate-x-full');
+    }, 100);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        notification.classList.add('translate-x-full');
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 300);
+    }, 3000);
+}
+
+// Smooth scroll to top after operations
+document.addEventListener('DOMContentLoaded', function() {
+    // Add click handlers for smooth scrolling
+    const scrollToTop = () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    
+    // Scroll to top when switching filters
+    const filterLinks = document.querySelectorAll('nav a[href*="filter="]');
+    filterLinks.forEach(link => {
+        link.addEventListener('click', scrollToTop);
     });
 });
 </script>

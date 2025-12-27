@@ -131,7 +131,7 @@ include '../includes/header.php';
         
         echo render_data_card(
             'New Alerts',
-            $unread_alerts,
+            '<span id="dashboard-new-alerts-count">' . $unread_alerts . '</span>',
             'Unread messages',
             'M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z',
             $unread_alerts > 0 ? 'warning' : 'primary'
@@ -190,8 +190,8 @@ include '../includes/header.php';
                     <h3 class="text-lg font-semibold">View Alerts</h3>
                     <p class="text-purple-100">Check doctor messages</p>
                     <?php if ($unread_alerts > 0): ?>
-                        <span class="inline-block mt-1 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full animate-pulse">
-                            <?php echo $unread_alerts; ?> new
+                        <span id="dashboard-alert-badge" class="inline-block mt-1 px-2 py-1 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full animate-pulse">
+                            <span id="dashboard-alert-count"><?php echo $unread_alerts; ?></span> new
                         </span>
                     <?php endif; ?>
                 </div>
@@ -325,3 +325,48 @@ include '../includes/header.php';
 </div>
 
 <?php include '../includes/footer.php'; ?>
+
+<script>
+// Listen for alert updates from other tabs/windows
+window.addEventListener('storage', function(e) {
+    if (e.key === 'alert_marked_read') {
+        const data = JSON.parse(e.newValue);
+        updateDashboardAlertCounts(data.unread_count);
+    }
+});
+
+// Function to update alert counts on dashboard
+function updateDashboardAlertCounts(unreadCount) {
+    // Update the "New Alerts" data card
+    const newAlertsCountElement = document.getElementById('dashboard-new-alerts-count');
+    if (newAlertsCountElement) {
+        newAlertsCountElement.textContent = unreadCount;
+    }
+    
+    // Update the alert badge in the quick actions
+    const alertBadge = document.getElementById('dashboard-alert-badge');
+    const alertCountElement = document.getElementById('dashboard-alert-count');
+    
+    if (unreadCount > 0) {
+        if (alertBadge) {
+            alertBadge.style.display = 'inline-block';
+            if (alertCountElement) {
+                alertCountElement.textContent = unreadCount;
+            }
+        }
+    } else {
+        if (alertBadge) {
+            alertBadge.style.display = 'none';
+        }
+    }
+}
+
+// Auto-refresh dashboard if there are unread alerts (every 10 minutes)
+<?php if ($unread_alerts > 0): ?>
+setTimeout(function() {
+    if (document.visibilityState === 'visible') {
+        window.location.reload();
+    }
+}, 600000); // 10 minutes
+<?php endif; ?>
+</script>
