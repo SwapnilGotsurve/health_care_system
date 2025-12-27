@@ -112,6 +112,9 @@
         </div>
     </footer>
 
+    <!-- User-Friendly JavaScript Enhancements -->
+    <script src="../assets/js/user-friendly.js"></script>
+    
     <!-- Mobile Menu Toggle Script -->
     <script>
         function toggleMobileMenu() {
@@ -143,29 +146,6 @@
             });
         });
 
-        // Add loading states for forms
-        document.addEventListener('DOMContentLoaded', function() {
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
-                    submitButtons.forEach(button => {
-                        button.disabled = true;
-                        if (button.tagName === 'BUTTON') {
-                            const originalText = button.innerHTML;
-                            button.innerHTML = `
-                                <svg class="animate-spin -ml-1 mr-3 h-4 w-4 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Processing...
-                            `;
-                        }
-                    });
-                });
-            });
-        });
-
         // Add fade-in animation for page content
         document.addEventListener('DOMContentLoaded', function() {
             const main = document.querySelector('main');
@@ -181,10 +161,10 @@
             }
         });
 
-        // Add notification system
+        // Enhanced notification system with better UX
         window.showNotification = function(message, type = 'info') {
             const notification = document.createElement('div');
-            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full`;
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 transform translate-x-full max-w-sm`;
             
             const colors = {
                 success: 'bg-green-500 text-white',
@@ -193,11 +173,23 @@
                 info: 'bg-blue-500 text-white'
             };
             
+            const icons = {
+                success: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+                error: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+                warning: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path></svg>',
+                info: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+            };
+            
             notification.className += ` ${colors[type] || colors.info}`;
             notification.innerHTML = `
-                <div class="flex items-center">
-                    <span class="mr-2">${message}</span>
-                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 mr-3">
+                        ${icons[type] || icons.info}
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium">${message}</p>
+                    </div>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-2 text-white hover:text-gray-200 flex-shrink-0">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                         </svg>
@@ -222,6 +214,23 @@
                 }, 300);
             }, 5000);
         };
+
+        // Global error handler for better user experience
+        window.addEventListener('error', function(e) {
+            console.error('JavaScript Error:', e.error);
+            if (window.HealthAlertSystem && window.HealthAlertSystem.showToast) {
+                window.HealthAlertSystem.showToast('An unexpected error occurred. Please refresh the page.', 'error');
+            }
+        });
+
+        // Handle network errors gracefully
+        window.addEventListener('online', function() {
+            showNotification('Connection restored', 'success');
+        });
+
+        window.addEventListener('offline', function() {
+            showNotification('Connection lost. Please check your internet connection.', 'warning');
+        });
     </script>
 </body>
 </html>

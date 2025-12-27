@@ -1,72 +1,192 @@
 <?php
 require_once '../includes/auth_check.php';
 require_once '../config/db.php';
+require_once '../includes/error_handler.php';
 
 $page_title = 'Doctor Dashboard';
 $user_id = $_SESSION['user_id'];
 $user_name = $_SESSION['name'];
 
-// Get assigned patients count
-$patients_query = "SELECT COUNT(*) as total FROM doctor_patients WHERE doctor_id = $user_id";
-$patients_result = mysqli_query($connection, $patients_query);
-$total_patients = mysqli_fetch_assoc($patients_result)['total'];
+// Initialize error handling
+$errors = [];
+$success_messages = [];
 
-// Get total alerts sent by this doctor
-$sent_alerts_query = "SELECT COUNT(*) as total FROM alerts WHERE doctor_id = $user_id";
-$sent_alerts_result = mysqli_query($connection, $sent_alerts_query);
-$total_alerts_sent = mysqli_fetch_assoc($sent_alerts_result)['total'];
+// Initialize variables with default values
+$total_patients = 0;
+$total_alerts_sent = 0;
+$unread_alerts_count = 0;
+$recent_data_count = 0;
+$active_patients_result = false;
+$inactive_patients_result = false;
+$recent_alerts_result = false;
 
-// Get unread alerts count (alerts with 'sent' status)
-$unread_alerts_query = "SELECT COUNT(*) as total FROM alerts WHERE doctor_id = $user_id AND status = 'sent'";
-$unread_alerts_result = mysqli_query($connection, $unread_alerts_query);
-$unread_alerts_count = mysqli_fetch_assoc($unread_alerts_result)['total'];
+try {
+    // Check database connection first
+    if (!$connection) {
+        throw new Exception("Database connection failed");
+    }
 
-// Get recent patient health data count (last 24 hours)
-$recent_data_query = "SELECT COUNT(DISTINCT hd.patient_id) as count 
-                     FROM health_data hd 
-                     JOIN doctor_patients dp ON hd.patient_id = dp.patient_id 
-                     WHERE dp.doctor_id = $user_id 
-                     AND hd.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)";
-$recent_data_result = mysqli_query($connection, $recent_data_query);
-$recent_data_count = mysqli_fetch_assoc($recent_data_result)['count'];
+    // Get assigned patients count
+    $patients_query = "SELECT COUNT(*) as total FROM doctor_patients WHERE doctor_id = ?";
+    $patients_stmt = mysqli_prepare($connection, $patients_query);
+    if ($patients_stmt) {
+        mysqli_stmt_bind_param($patients_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($patients_stmt)) {
+            throw new Exception("Failed to execute patients count query: " . mysqli_stmt_error($patients_stmt));
+        }
+        $patients_result = mysqli_stmt_get_result($patients_stmt);
+        $total_patients = mysqli_fetch_assoc($patients_result)['total'];
+        mysqli_stmt_close($patients_stmt);
+    } else {
+        throw new Exception("Failed to prepare patients count query: " . mysqli_error($connection));
+    }
 
-// Get patients with recent health data (last 7 days) for activity overview
-$active_patients_query = "SELECT u.name, u.id, COUNT(hd.id) as record_count, MAX(hd.created_at) as last_entry
-                         FROM users u
-                         JOIN doctor_patients dp ON u.id = dp.patient_id
-                         LEFT JOIN health_data hd ON u.id = hd.patient_id 
-                         WHERE dp.doctor_id = $user_id 
-                         AND hd.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                         GROUP BY u.id, u.name
-                         ORDER BY last_entry DESC
-                         LIMIT 5";
-$active_patients_result = mysqli_query($connection, $active_patients_query);
+    // Get total alerts sent by this doctor
+    $sent_alerts_query = "SELECT COUNT(*) as total FROM alerts WHERE doctor_id = ?";
+    $sent_alerts_stmt = mysqli_prepare($connection, $sent_alerts_query);
+    if ($sent_alerts_stmt) {
+        mysqli_stmt_bind_param($sent_alerts_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($sent_alerts_stmt)) {
+            throw new Exception("Failed to execute alerts count query: " . mysqli_stmt_error($sent_alerts_stmt));
+        }
+        $sent_alerts_result = mysqli_stmt_get_result($sent_alerts_stmt);
+        $total_alerts_sent = mysqli_fetch_assoc($sent_alerts_result)['total'];
+        mysqli_stmt_close($sent_alerts_stmt);
+    } else {
+        throw new Exception("Failed to prepare alerts count query: " . mysqli_error($connection));
+    }
 
-// Get patients needing attention (no recent data in 7 days)
-$inactive_patients_query = "SELECT u.name, u.id, MAX(hd.created_at) as last_entry
-                           FROM users u
-                           JOIN doctor_patients dp ON u.id = dp.patient_id
-                           LEFT JOIN health_data hd ON u.id = hd.patient_id
-                           WHERE dp.doctor_id = $user_id
-                           GROUP BY u.id, u.name
-                           HAVING last_entry IS NULL OR last_entry < DATE_SUB(NOW(), INTERVAL 7 DAY)
-                           ORDER BY last_entry ASC
+    // Get unread alerts count (alerts with 'sent' status)
+    $unread_alerts_query = "SELECT COUNT(*) as total FROM alerts WHERE doctor_id = ? AND status = 'sent'";
+    $unread_alerts_stmt = mysqli_prepare($connection, $unread_alerts_query);
+    if ($unread_alerts_stmt) {
+        mysqli_stmt_bind_param($unread_alerts_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($unread_alerts_stmt)) {
+            throw new Exception("Failed to execute unread alerts query: " . mysqli_stmt_error($unread_alerts_stmt));
+        }
+        $unread_alerts_result = mysqli_stmt_get_result($unread_alerts_stmt);
+        $unread_alerts_count = mysqli_fetch_assoc($unread_alerts_result)['total'];
+        mysqli_stmt_close($unread_alerts_stmt);
+    } else {
+        throw new Exception("Failed to prepare unread alerts query: " . mysqli_error($connection));
+    }
+
+    // Get recent patient health data count (last 24 hours)
+    $recent_data_query = "SELECT COUNT(DISTINCT hd.patient_id) as count 
+                         FROM health_data hd 
+                         JOIN doctor_patients dp ON hd.patient_id = dp.patient_id 
+                         WHERE dp.doctor_id = ? 
+                         AND hd.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)";
+    $recent_data_stmt = mysqli_prepare($connection, $recent_data_query);
+    if ($recent_data_stmt) {
+        mysqli_stmt_bind_param($recent_data_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($recent_data_stmt)) {
+            throw new Exception("Failed to execute recent data query: " . mysqli_stmt_error($recent_data_stmt));
+        }
+        $recent_data_result = mysqli_stmt_get_result($recent_data_stmt);
+        $recent_data_count = mysqli_fetch_assoc($recent_data_result)['count'];
+        mysqli_stmt_close($recent_data_stmt);
+    } else {
+        throw new Exception("Failed to prepare recent data query: " . mysqli_error($connection));
+    }
+
+    // Get patients with recent health data (last 7 days) for activity overview
+    $active_patients_query = "SELECT u.name, u.id, COUNT(hd.id) as record_count, MAX(hd.created_at) as last_entry
+                             FROM users u
+                             JOIN doctor_patients dp ON u.id = dp.patient_id
+                             LEFT JOIN health_data hd ON u.id = hd.patient_id 
+                             WHERE dp.doctor_id = ? 
+                             AND hd.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                             GROUP BY u.id, u.name
+                             ORDER BY last_entry DESC
+                             LIMIT 5";
+    $active_patients_stmt = mysqli_prepare($connection, $active_patients_query);
+    if ($active_patients_stmt) {
+        mysqli_stmt_bind_param($active_patients_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($active_patients_stmt)) {
+            // This query might fail if no health data exists, which is OK
+            $active_patients_result = false;
+        } else {
+            $active_patients_result = mysqli_stmt_get_result($active_patients_stmt);
+        }
+        mysqli_stmt_close($active_patients_stmt);
+    } else {
+        $active_patients_result = false;
+    }
+
+    // Get patients needing attention (no recent data in 7 days)
+    $inactive_patients_query = "SELECT u.name, u.id, MAX(hd.created_at) as last_entry
+                               FROM users u
+                               JOIN doctor_patients dp ON u.id = dp.patient_id
+                               LEFT JOIN health_data hd ON u.id = hd.patient_id
+                               WHERE dp.doctor_id = ?
+                               GROUP BY u.id, u.name
+                               HAVING last_entry IS NULL OR last_entry < DATE_SUB(NOW(), INTERVAL 7 DAY)
+                               ORDER BY last_entry ASC
+                               LIMIT 5";
+    $inactive_patients_stmt = mysqli_prepare($connection, $inactive_patients_query);
+    if ($inactive_patients_stmt) {
+        mysqli_stmt_bind_param($inactive_patients_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($inactive_patients_stmt)) {
+            // This query might fail if no patients exist, which is OK
+            $inactive_patients_result = false;
+        } else {
+            $inactive_patients_result = mysqli_stmt_get_result($inactive_patients_stmt);
+        }
+        mysqli_stmt_close($inactive_patients_stmt);
+    } else {
+        $inactive_patients_result = false;
+    }
+
+    // Get recent alerts sent by this doctor
+    $recent_alerts_query = "SELECT a.message, a.created_at, u.name as patient_name, a.status
+                           FROM alerts a
+                           JOIN users u ON a.patient_id = u.id
+                           WHERE a.doctor_id = ?
+                           ORDER BY a.created_at DESC
                            LIMIT 5";
-$inactive_patients_result = mysqli_query($connection, $inactive_patients_query);
+    $recent_alerts_stmt = mysqli_prepare($connection, $recent_alerts_query);
+    if ($recent_alerts_stmt) {
+        mysqli_stmt_bind_param($recent_alerts_stmt, "i", $user_id);
+        if (!mysqli_stmt_execute($recent_alerts_stmt)) {
+            // This query might fail if no alerts exist, which is OK
+            $recent_alerts_result = false;
+        } else {
+            $recent_alerts_result = mysqli_stmt_get_result($recent_alerts_stmt);
+        }
+        mysqli_stmt_close($recent_alerts_stmt);
+    } else {
+        $recent_alerts_result = false;
+    }
 
-// Get recent alerts sent by this doctor
-$recent_alerts_query = "SELECT a.message, a.created_at, u.name as patient_name, a.status
-                       FROM alerts a
-                       JOIN users u ON a.patient_id = u.id
-                       WHERE a.doctor_id = $user_id
-                       ORDER BY a.created_at DESC
-                       LIMIT 5";
-$recent_alerts_result = mysqli_query($connection, $recent_alerts_query);
+} catch (Exception $e) {
+    error_log("Doctor Dashboard Error: " . $e->getMessage());
+    
+    // Show user-friendly error instead of technical details
+    $errors[] = "Unable to load dashboard data at this time. Please try refreshing the page.";
+    
+    // Ensure all variables are set to prevent further errors
+    $total_patients = $total_patients ?? 0;
+    $total_alerts_sent = $total_alerts_sent ?? 0;
+    $unread_alerts_count = $unread_alerts_count ?? 0;
+    $recent_data_count = $recent_data_count ?? 0;
+    $active_patients_result = $active_patients_result ?? false;
+    $inactive_patients_result = $inactive_patients_result ?? false;
+    $recent_alerts_result = $recent_alerts_result ?? false;
+}
 
 include '../includes/header.php';
 ?>
 
 <div class="max-w-7xl mx-auto">
+    <!-- Session Messages -->
+    <?php echo display_session_messages(); ?>
+    
+    <!-- Error Messages -->
+    <?php if (!empty($errors)): ?>
+        <?php echo handle_validation_errors($errors); ?>
+    <?php endif; ?>
+
     <!-- Welcome Header -->
     <div class="bg-white rounded-lg shadow-md p-6 mb-6 animate-fade-in-up">
         <h1 class="text-3xl font-bold text-gray-800 mb-2">Welcome, Dr. <?php echo htmlspecialchars($user_name); ?>!</h1>
@@ -75,39 +195,69 @@ include '../includes/header.php';
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <?php
-        echo render_data_card(
-            'Assigned Patients',
-            $total_patients,
-            'Total under care',
-            'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z',
-            'primary'
-        );
+        <!-- Assigned Patients Card -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-800"><?php echo $total_patients; ?></p>
+                    <p class="text-gray-600">Assigned Patients</p>
+                    <p class="text-sm text-gray-500">Total under care</p>
+                </div>
+            </div>
+        </div>
         
-        echo render_data_card(
-            'Active Today',
-            $recent_data_count,
-            'Patients with new data',
-            'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-            'success'
-        );
+        <!-- Active Today Card -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-green-100 text-green-600 mr-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-800"><?php echo $recent_data_count; ?></p>
+                    <p class="text-gray-600">Active Today</p>
+                    <p class="text-sm text-gray-500">Patients with new data</p>
+                </div>
+            </div>
+        </div>
         
-        echo render_data_card(
-            'Alerts Sent',
-            $total_alerts_sent,
-            'Total communications',
-            'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z',
-            'primary'
-        );
+        <!-- Alerts Sent Card -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-purple-100 text-purple-600 mr-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-800"><?php echo $total_alerts_sent; ?></p>
+                    <p class="text-gray-600">Alerts Sent</p>
+                    <p class="text-sm text-gray-500">Total communications</p>
+                </div>
+            </div>
+        </div>
         
-        echo render_data_card(
-            'Unread Alerts',
-            $unread_alerts_count,
-            'Awaiting patient response',
-            'M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z',
-            $unread_alerts_count > 0 ? 'warning' : 'primary'
-        );
-        ?>
+        <!-- Unread Alerts Card -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <div class="flex items-center">
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mr-4">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-5 5v-5zM4 19h6v-2H4v2zM4 15h8v-2H4v2zM4 11h8V9H4v2z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-800"><?php echo $unread_alerts_count; ?></p>
+                    <p class="text-gray-600">Unread Alerts</p>
+                    <p class="text-sm text-gray-500">Awaiting patient response</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Quick Actions -->
@@ -170,26 +320,31 @@ include '../includes/header.php';
             <?php if ($total_patients > 0): ?>
                 <div class="space-y-3 mb-4">
                     <?php
-                    // Get a quick overview of assigned patients
+                    // Get a quick overview of assigned patients with error handling
                     $patient_overview_query = "SELECT u.id, u.name, u.email, dp.created_at as assigned_date,
                                               COUNT(hd.id) as health_records,
                                               MAX(hd.created_at) as last_health_data
                                               FROM users u 
                                               JOIN doctor_patients dp ON u.id = dp.patient_id 
                                               LEFT JOIN health_data hd ON u.id = hd.patient_id
-                                              WHERE dp.doctor_id = $user_id AND u.role = 'patient'
+                                              WHERE dp.doctor_id = ? AND u.role = 'patient'
                                               GROUP BY u.id, u.name, u.email, dp.created_at
                                               ORDER BY dp.created_at DESC
                                               LIMIT 3";
-                    $patient_overview_result = mysqli_query($connection, $patient_overview_query);
                     
-                    while ($patient = mysqli_fetch_assoc($patient_overview_result)):
-                        $days_since_data = $patient['last_health_data'] ? 
-                            floor((time() - strtotime($patient['last_health_data'])) / (60 * 60 * 24)) : null;
-                        $status_color = $days_since_data === null ? 'gray' : 
-                                       ($days_since_data > 7 ? 'warning' : 
-                                       ($days_since_data > 3 ? 'info' : 'success'));
-                    ?>
+                    $patient_overview_stmt = mysqli_prepare($connection, $patient_overview_query);
+                    if ($patient_overview_stmt) {
+                        mysqli_stmt_bind_param($patient_overview_stmt, "i", $user_id);
+                        mysqli_stmt_execute($patient_overview_stmt);
+                        $patient_overview_result = mysqli_stmt_get_result($patient_overview_stmt);
+                        
+                        while ($patient = mysqli_fetch_assoc($patient_overview_result)):
+                            $days_since_data = $patient['last_health_data'] ? 
+                                floor((time() - strtotime($patient['last_health_data'])) / (60 * 60 * 24)) : null;
+                            $status_color = $days_since_data === null ? 'gray' : 
+                                           ($days_since_data > 7 ? 'warning' : 
+                                           ($days_since_data > 3 ? 'info' : 'success'));
+                        ?>
                     <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 hover-lift">
                         <div class="flex items-center">
                             <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
@@ -223,7 +378,13 @@ include '../includes/header.php';
                             </a>
                         </div>
                     </div>
-                    <?php endwhile; ?>
+                    <?php 
+                        endwhile;
+                        mysqli_stmt_close($patient_overview_stmt);
+                    } else {
+                        echo display_user_friendly_error('database', 'Patient overview query failed', 'Unable to load patient overview at this time.');
+                    }
+                    ?>
                 </div>
                 
                 <div class="text-center">
@@ -271,7 +432,7 @@ include '../includes/header.php';
                 </div>
                 Recent Patient Activity
             </h2>
-            <?php if (mysqli_num_rows($active_patients_result) > 0): ?>
+            <?php if ($active_patients_result && mysqli_num_rows($active_patients_result) > 0): ?>
                 <div class="space-y-3">
                     <?php while ($patient = mysqli_fetch_assoc($active_patients_result)): ?>
                     <div class="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-l-4 border-green-400 hover-lift">
@@ -280,20 +441,29 @@ include '../includes/header.php';
                             <div>
                                 <p class="font-medium text-gray-900"><?php echo htmlspecialchars($patient['name']); ?></p>
                                 <p class="text-sm text-gray-600">
-                                    <?php echo render_status_badge($patient['record_count'] . ' records', 'success'); ?>
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        <?php echo $patient['record_count']; ?> records
+                                    </span>
                                     <span class="ml-2 text-gray-500">
                                         Last: <?php echo date('M j, g:i A', strtotime($patient['last_entry'])); ?>
                                     </span>
                                 </p>
                             </div>
                         </div>
-                        <?php echo render_button('View', 'button', 'primary', 'sm', false, ['onclick' => "window.location.href='patient_stats.php?patient_id={$patient['id']}'"]) ?>
+                        <a href="patient_stats.php?patient_id=<?php echo $patient['id']; ?>" 
+                           class="inline-flex items-center justify-center font-medium rounded-md transition-all duration-200 bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md px-3 py-2 text-sm">
+                            View
+                        </a>
                     </div>
                     <?php endwhile; ?>
                 </div>
             <?php else: ?>
                 <div class="text-center py-8">
-                    <?php echo render_loading_skeleton(3, ['80%', '60%', '40%']); ?>
+                    <div class="animate-pulse">
+                        <div class="h-4 bg-gray-200 rounded mb-3" style="width: 80%"></div>
+                        <div class="h-4 bg-gray-200 rounded mb-3" style="width: 60%"></div>
+                        <div class="h-4 bg-gray-200 rounded mb-3" style="width: 40%"></div>
+                    </div>
                     <p class="text-gray-500 mt-4">No recent patient activity</p>
                 </div>
             <?php endif; ?>
@@ -318,7 +488,7 @@ include '../includes/header.php';
                 </div>
                 Patients Needing Attention
             </h2>
-            <?php if (mysqli_num_rows($inactive_patients_result) > 0): ?>
+            <?php if ($inactive_patients_result && mysqli_num_rows($inactive_patients_result) > 0): ?>
                 <div class="space-y-3">
                     <?php while ($patient = mysqli_fetch_assoc($inactive_patients_result)): ?>
                     <div class="flex items-center justify-between p-4 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg border-l-4 border-yellow-400 hover-lift">
@@ -328,14 +498,21 @@ include '../includes/header.php';
                                 <p class="font-medium text-gray-900"><?php echo htmlspecialchars($patient['name']); ?></p>
                                 <p class="text-sm text-gray-600">
                                     <?php if ($patient['last_entry']): ?>
-                                        <?php echo render_status_badge('Last: ' . date('M j, Y', strtotime($patient['last_entry'])), 'warning'); ?>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            Last: <?php echo date('M j, Y', strtotime($patient['last_entry'])); ?>
+                                        </span>
                                     <?php else: ?>
-                                        <?php echo render_status_badge('No data recorded', 'danger'); ?>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            No data recorded
+                                        </span>
                                     <?php endif; ?>
                                 </p>
                             </div>
                         </div>
-                        <?php echo render_button('Send Alert', 'button', 'warning', 'sm', false, ['onclick' => "window.location.href='send_alert.php?patient_id={$patient['id']}'"]) ?>
+                        <a href="send_alert.php?patient_id=<?php echo $patient['id']; ?>" 
+                           class="inline-flex items-center justify-center font-medium rounded-md transition-all duration-200 bg-yellow-500 hover:bg-yellow-600 text-white shadow-sm hover:shadow-md px-3 py-2 text-sm">
+                            Send Alert
+                        </a>
                     </div>
                     <?php endwhile; ?>
                 </div>
@@ -356,27 +533,52 @@ include '../includes/header.php';
     <!-- Recent Alerts -->
     <div class="bg-white rounded-lg shadow-md p-6 animate-fade-in-up stagger-6">
         <h2 class="text-xl font-bold text-gray-800 mb-4">Recent Alerts Sent</h2>
-        <?php if (mysqli_num_rows($recent_alerts_result) > 0): ?>
-            <?php
-            $headers = ['Patient', 'Message', 'Sent', 'Status'];
-            $rows = [];
-            
-            mysqli_data_seek($recent_alerts_result, 0);
-            while ($alert = mysqli_fetch_assoc($recent_alerts_result)) {
-                $status_badge = $alert['status'] === 'sent' 
-                    ? render_status_badge('Unread', 'warning') 
-                    : render_status_badge('Read', 'success');
-                    
-                $rows[] = [
-                    htmlspecialchars($alert['patient_name']),
-                    htmlspecialchars(substr($alert['message'], 0, 60)) . (strlen($alert['message']) > 60 ? '...' : ''),
-                    date('M j, g:i A', strtotime($alert['created_at'])),
-                    $status_badge
-                ];
-            }
-            
-            echo render_data_table($headers, $rows);
-            ?>
+        <?php if ($recent_alerts_result && mysqli_num_rows($recent_alerts_result) > 0): ?>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Patient</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Message</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <?php 
+                        mysqli_data_seek($recent_alerts_result, 0);
+                        while ($alert = mysqli_fetch_assoc($recent_alerts_result)): 
+                        ?>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                <?php echo htmlspecialchars($alert['patient_name']); ?>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">
+                                <?php echo htmlspecialchars(substr($alert['message'], 0, 60)) . (strlen($alert['message']) > 60 ? '...' : ''); ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                <?php echo date('M j, g:i A', strtotime($alert['created_at'])); ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <?php if ($alert['status'] === 'sent'): ?>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        Unread
+                                    </span>
+                                <?php elseif ($alert['status'] === 'seen'): ?>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                        Read
+                                    </span>
+                                <?php else: ?>
+                                    <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        <?php echo htmlspecialchars($alert['status']); ?>
+                                    </span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
             <div class="mt-6 text-center">
                 <a href="sent_alerts.php" class="inline-flex items-center text-primary-600 hover:text-primary-800 font-medium transition-colors hover-underline">
                     View All Sent Alerts
@@ -394,7 +596,9 @@ include '../includes/header.php';
                 </div>
                 <h3 class="text-lg font-medium text-gray-900 mb-2">No Alerts Sent Yet</h3>
                 <p class="text-gray-600 mb-6">Start communicating with your patients by sending health alerts.</p>
-                <?php echo render_button('Send First Alert', 'button', 'primary', 'lg', false, ['onclick' => "window.location.href='send_alert.php'"]); ?>
+                <a href="send_alert.php" class="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-md font-medium transition-colors">
+                    Send First Alert
+                </a>
             </div>
         <?php endif; ?>
     </div>

@@ -25,13 +25,48 @@ $database = 'health_alert_system';  // Target database name
 $connection = mysqli_connect($host, $username, $password, $database);
 
 /**
- * Connection error handling
+ * Connection error handling with user-friendly messages
  * 
- * If the connection fails, the script terminates with an error message.
- * In production, this should log errors instead of displaying them.
+ * If the connection fails, show a user-friendly error page instead of
+ * technical error messages that might confuse users.
  */
 if (!$connection) {
-    die("Database Connection Error: " . mysqli_connect_error());
+    // Log the technical error for debugging
+    error_log("Database Connection Failed: " . mysqli_connect_error());
+    
+    // Show user-friendly error page
+    ?>
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Service Temporarily Unavailable - Health Alert System</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-gray-50 min-h-screen flex items-center justify-center">
+        <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
+            <div class="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-6">
+                <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h1 class="text-xl font-bold text-gray-900 mb-4">Service Temporarily Unavailable</h1>
+            <p class="text-gray-600 mb-6">We're experiencing technical difficulties. Please try again in a few moments.</p>
+            <div class="space-y-3">
+                <button onclick="location.reload()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
+                    Try Again
+                </button>
+                <a href="index.php" class="block w-full bg-gray-300 hover:bg-gray-400 text-gray-700 px-4 py-2 rounded-md transition-colors">
+                    Go to Home
+                </a>
+            </div>
+            <p class="text-xs text-gray-500 mt-6">If this problem persists, please contact support.</p>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit();
 }
 
 /**

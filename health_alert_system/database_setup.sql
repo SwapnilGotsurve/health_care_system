@@ -19,7 +19,7 @@ CREATE TABLE users (
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role ENUM('patient', 'doctor', 'admin') NOT NULL,
-    status ENUM('pending', 'approved') DEFAULT 'approved',
+    status ENUM('active', 'pending', 'inactive') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -61,29 +61,29 @@ CREATE TABLE doctor_patients (
 -- Insert sample users
 -- Default admin account (password: admin123)
 INSERT INTO users (name, email, password, role, status) VALUES
-('System Administrator', 'admin@healthalert.com', 'admin123', 'admin', 'approved');
+('System Administrator', 'admin@healthalert.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'active');
 
 -- Sample approved doctors (password: doctor123)
 INSERT INTO users (name, email, password, role, status) VALUES
-('Dr. Sarah Johnson', 'sarah.johnson@hospital.com', 'doctor123', 'doctor', 'approved'),
-('Dr. Michael Chen', 'michael.chen@clinic.com', 'doctor123', 'doctor', 'approved'),
-('Dr. Emily Rodriguez', 'emily.rodriguez@medical.com', 'doctor123', 'doctor', 'approved');
+('Dr. Sarah Johnson', 'sarah.johnson@hospital.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'doctor', 'active'),
+('Dr. Michael Chen', 'michael.chen@clinic.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'doctor', 'active'),
+('Dr. Emily Rodriguez', 'emily.rodriguez@medical.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'doctor', 'active');
 
 -- Sample pending doctors (password: doctor123)
 INSERT INTO users (name, email, password, role, status) VALUES
-('Dr. James Wilson', 'james.wilson@newdoc.com', 'doctor123', 'doctor', 'pending'),
-('Dr. Lisa Thompson', 'lisa.thompson@healthcare.com', 'doctor123', 'doctor', 'pending');
+('Dr. James Wilson', 'james.wilson@newdoc.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'doctor', 'pending'),
+('Dr. Lisa Thompson', 'lisa.thompson@healthcare.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'doctor', 'pending');
 
 -- Sample patients (password: patient123)
 INSERT INTO users (name, email, password, role, status) VALUES
-('John Smith', 'john.smith@email.com', 'patient123', 'patient', 'approved'),
-('Mary Johnson', 'mary.johnson@email.com', 'patient123', 'patient', 'approved'),
-('Robert Brown', 'robert.brown@email.com', 'patient123', 'patient', 'approved'),
-('Jennifer Davis', 'jennifer.davis@email.com', 'patient123', 'patient', 'approved'),
-('William Miller', 'william.miller@email.com', 'patient123', 'patient', 'approved'),
-('Elizabeth Wilson', 'elizabeth.wilson@email.com', 'patient123', 'patient', 'approved'),
-('David Anderson', 'david.anderson@email.com', 'patient123', 'patient', 'approved'),
-('Susan Taylor', 'susan.taylor@email.com', 'patient123', 'patient', 'approved');
+('John Smith', 'john.smith@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('Mary Johnson', 'mary.johnson@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('Robert Brown', 'robert.brown@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('Jennifer Davis', 'jennifer.davis@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('William Miller', 'william.miller@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('Elizabeth Wilson', 'elizabeth.wilson@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('David Anderson', 'david.anderson@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active'),
+('Susan Taylor', 'susan.taylor@email.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'patient', 'active');
 
 -- Create doctor-patient assignments
 -- Dr. Sarah Johnson (id: 2) assigned to patients 6, 7, 8

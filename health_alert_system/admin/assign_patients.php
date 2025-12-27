@@ -2,6 +2,10 @@
 require_once '../includes/auth_check.php';
 require_once '../config/db.php';
 
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 // Ensure user is admin
 if ($_SESSION['role'] !== 'admin') {
     header('Location: ../index.php');
@@ -9,45 +13,52 @@ if ($_SESSION['role'] !== 'admin') {
 }
 
 // Handle assignment actions
-$message = '';
-$message_type = '';
-
-if ($_POST) {
-    if (isset($_POST['assign_patient'])) {
-        $doctor_id = (int)$_POST['doctor_id'];
-        $patient_id = (int)$_POST['patient_id'];
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $doctor_id = $_POST['doctor_id'] ?? '';
+    $patient_id = $_POST['patient_id'] ?? '';
+    
+    if (!empty($doctor_id) && !empty($patient_id)) {
+        // Check if already assigned
+        $check = mysqli_query($connection, "
+            SELECT id FROM doctor_patients 
+            WHERE doctor_id = '$doctor_id' AND patient_id = '$patient_id'
+        ");
         
-        // Check if assignment already exists
-        $check_query = "SELECT id FROM doctor_patients WHERE doctor_id = $doctor_id AND patient_id = $patient_id";
-        $check_result = mysqli_query($connection, $check_query);
-        
-        if (mysqli_num_rows($check_result) == 0) {
-            $assign_query = "INSERT INTO doctor_patients (doctor_id, patient_id) VALUES ($doctor_id, $patient_id)";
-            if (mysqli_query($connection, $assign_query)) {
-                $message = "Patient assigned to doctor successfully!";
-                $message_type = "success";
+        if (mysqli_num_rows($check) == 0) {
+            $insert = mysqli_query($connection, "
+                INSERT INTO doctor_patients (doctor_id, patient_id, created_at) 
+                VALUES ('$doctor_id', '$patient_id', NOW())
+            ");
+            
+            if ($insert) {
+                $_SESSION['success'] = "Patient assigned successfully!";
             } else {
-                $message = "Error assigning patient: " . mysqli_error($connection);
-                $message_type = "error";
+                $_SESSION['error'] = "Database error: " . mysqli_error($connection);
             }
         } else {
-            $message = "This patient is already assigned to this doctor.";
-            $message_type = "error";
+            $_SESSION['error'] = "Patient already assigned to this doctor.";
         }
+    } else {
+        $_SESSION['error'] = "Please select both doctor and patient.";
     }
     
-    if (isset($_POST['remove_assignment'])) {
-        $assignment_id = (int)$_POST['assignment_id'];
-        
-        $remove_query = "DELETE FROM doctor_patients WHERE id = $assignment_id";
-        if (mysqli_query($connection, $remove_query)) {
-            $message = "Assignment removed successfully!";
-            $message_type = "success";
-        } else {
-            $message = "Error removing assignment: " . mysqli_error($connection);
-            $message_type = "error";
-        }
+    header("Location: assign_patients.php");
+    exit();
+}
+
+// Handle remove assignment
+if (isset($_POST['remove_assignment'])) {
+    $assignment_id = (int)$_POST['assignment_id'];
+    
+    $remove_query = "DELETE FROM doctor_patients WHERE id = $assignment_id";
+    if (mysqli_query($connection, $remove_query)) {
+        $_SESSION['success'] = "Assignment removed successfully!";
+    } else {
+        $_SESSION['error'] = "Error removing assignment: " . mysqli_error($connection);
     }
+    
+    header("Location: assign_patients.php");
+    exit();
 }
 
 // Get approved doctors
@@ -70,41 +81,19 @@ if ($doctors_count == 0 || $patients_count == 0) {
     $message_type = "error";
 }
 
-// Check if created_at column exists in doctor_patients table
-$check_column_query = "SHOW COLUMNS FROM doctor_patients LIKE 'created_at'";
-$column_check = mysqli_query($connection, $check_column_query);
-$has_created_at = mysqli_num_rows($column_check) > 0;
-
 // Get current assignments with doctor and patient names
-if ($has_created_at) {
-    $assignments_query = "SELECT dp.id,
-                                d.name as doctor_name, d.email as doctor_email,
-                                p.name as patient_name, p.email as patient_email,
-                                COUNT(hd.id) as health_records,
-                                COUNT(a.id) as alerts_sent,
-                                dp.created_at
-                         FROM doctor_patients dp
-                         JOIN users d ON dp.doctor_id = d.id
-                         JOIN users p ON dp.patient_id = p.id
-                         LEFT JOIN health_data hd ON p.id = hd.patient_id
-                         LEFT JOIN alerts a ON dp.doctor_id = a.doctor_id AND dp.patient_id = a.patient_id
-                         GROUP BY dp.id, dp.created_at, d.name, d.email, p.name, p.email
-                         ORDER BY dp.id DESC";
-} else {
-    $assignments_query = "SELECT dp.id,
-                                d.name as doctor_name, d.email as doctor_email,
-                                p.name as patient_name, p.email as patient_email,
-                                COUNT(hd.id) as health_records,
-                                COUNT(a.id) as alerts_sent,
-                                NULL as created_at
-                         FROM doctor_patients dp
-                         JOIN users d ON dp.doctor_id = d.id
-                         JOIN users p ON dp.patient_id = p.id
-                         LEFT JOIN health_data hd ON p.id = hd.patient_id
-                         LEFT JOIN alerts a ON dp.doctor_id = a.doctor_id AND dp.patient_id = a.patient_id
-                         GROUP BY dp.id, d.name, d.email, p.name, p.email
-                         ORDER BY dp.id DESC";
-}
+$assignments_query = "SELECT 
+    dp.id,
+    d.name AS doctor_name,
+    d.email AS doctor_email,
+    p.name AS patient_name,
+    p.email AS patient_email,
+    dp.created_at
+FROM doctor_patients dp 
+JOIN users d ON dp.doctor_id = d.id 
+JOIN users p ON dp.patient_id = p.id 
+ORDER BY dp.created_at DESC";
+
 $assignments_result = mysqli_query($connection, $assignments_query);
 
 include '../includes/header.php';
@@ -128,9 +117,15 @@ include '../includes/header.php';
     </div>
 
     <!-- Success/Error Messages -->
-    <?php if ($message): ?>
-    <div class="mb-6 p-4 rounded-md <?php echo $message_type == 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'; ?>">
-        <?php echo htmlspecialchars($message); ?>
+    <?php if (isset($_SESSION['success'])): ?>
+    <div class="mb-6 p-4 rounded-md bg-green-50 text-green-800 border border-green-200">
+        <?php echo htmlspecialchars($_SESSION['success']); unset($_SESSION['success']); ?>
+    </div>
+    <?php endif; ?>
+    
+    <?php if (isset($_SESSION['error'])): ?>
+    <div class="mb-6 p-4 rounded-md bg-red-50 text-red-800 border border-red-200">
+        <?php echo htmlspecialchars($_SESSION['error']); unset($_SESSION['error']); ?>
     </div>
     <?php endif; ?>
 
@@ -216,7 +211,7 @@ include '../includes/header.php';
             </div>
             
             <div>
-                <button type="submit" name="assign_patient" 
+                <button type="submit" 
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors <?php echo ($doctors_count == 0 || $patients_count == 0) ? 'opacity-50 cursor-not-allowed' : ''; ?>"
                         <?php echo ($doctors_count == 0 || $patients_count == 0) ? 'disabled' : ''; ?>>
                     Assign Patient
@@ -244,9 +239,6 @@ include '../includes/header.php';
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Patient
-                        </th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            Activity
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Assigned Date
@@ -294,18 +286,6 @@ include '../includes/header.php';
                                     <div class="text-sm text-gray-500">
                                         <?php echo htmlspecialchars($assignment['patient_email']); ?>
                                     </div>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <div class="text-sm text-gray-900">
-                                <div class="flex items-center space-x-4">
-                                    <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded">
-                                        <?php echo $assignment['health_records']; ?> records
-                                    </span>
-                                    <span class="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded">
-                                        <?php echo $assignment['alerts_sent']; ?> alerts
-                                    </span>
                                 </div>
                             </div>
                         </td>
@@ -363,27 +343,21 @@ include '../includes/header.php';
     $stats_query = "SELECT 
                       COUNT(DISTINCT dp.doctor_id) as doctors_with_patients,
                       COUNT(DISTINCT dp.patient_id) as patients_assigned,
-                      COUNT(*) as total_assignments,
-                      AVG(patient_counts.patient_count) as avg_patients_per_doctor
-                   FROM doctor_patients dp
-                   LEFT JOIN (
-                       SELECT doctor_id, COUNT(*) as patient_count 
-                       FROM doctor_patients 
-                       GROUP BY doctor_id
-                   ) patient_counts ON dp.doctor_id = patient_counts.doctor_id";
+                      COUNT(*) as total_assignments
+                   FROM doctor_patients dp";
     $stats_result = mysqli_query($connection, $stats_query);
     $stats = mysqli_fetch_assoc($stats_result);
     
     // Get unassigned counts
     $unassigned_doctors_query = "SELECT COUNT(*) as count FROM users 
                                 WHERE role = 'doctor' AND status = 'approved' 
-                                AND id NOT IN (SELECT DISTINCT doctor_id FROM doctor_patients)";
+                                AND id NOT IN (SELECT DISTINCT doctor_id FROM doctor_patients WHERE doctor_id IS NOT NULL)";
     $unassigned_doctors_result = mysqli_query($connection, $unassigned_doctors_query);
     $unassigned_doctors = mysqli_fetch_assoc($unassigned_doctors_result)['count'];
     
     $unassigned_patients_query = "SELECT COUNT(*) as count FROM users 
                                  WHERE role = 'patient' 
-                                 AND id NOT IN (SELECT DISTINCT patient_id FROM doctor_patients)";
+                                 AND id NOT IN (SELECT DISTINCT patient_id FROM doctor_patients WHERE patient_id IS NOT NULL)";
     $unassigned_patients_result = mysqli_query($connection, $unassigned_patients_query);
     $unassigned_patients = mysqli_fetch_assoc($unassigned_patients_result)['count'];
     ?>
@@ -441,8 +415,9 @@ include '../includes/header.php';
                     </svg>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-800"><?php echo $stats['avg_patients_per_doctor'] ? round($stats['avg_patients_per_doctor'], 1) : '0'; ?></p>
-                    <p class="text-gray-600">Avg per Doctor</p>
+                    <p class="text-2xl font-bold text-gray-800"><?php echo $unassigned_doctors + $unassigned_patients; ?></p>
+                    <p class="text-gray-600">Unassigned Users</p>
+                    <p class="text-xs text-gray-500"><?php echo $unassigned_doctors; ?> doctors, <?php echo $unassigned_patients; ?> patients</p>
                 </div>
             </div>
         </div>

@@ -49,7 +49,7 @@ if ($_POST) {
         $error = 'Alert message must be 1000 characters or less.';
     } else {
         // Verify patient is assigned to this doctor
-        $verify_query = "SELECT id FROM users u 
+        $verify_query = "SELECT u.id FROM users u 
                         JOIN doctor_patients dp ON u.id = dp.patient_id 
                         WHERE dp.doctor_id = $user_id AND dp.patient_id = $patient_id AND u.role = 'patient'";
         
