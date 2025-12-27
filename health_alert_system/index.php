@@ -70,139 +70,158 @@ if ($_POST) {
 include 'includes/header.php';
 ?>
 
-<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-white to-indigo-50">
     <div class="max-w-md w-full space-y-8">
         <!-- Header -->
         <div class="text-center animate-fade-in-up">
-            <div class="mx-auto h-16 w-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl flex items-center justify-center mb-6">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="mx-auto h-20 w-20 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg hover-lift">
+                <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
                 </svg>
             </div>
-            <h2 class="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-            <p class="text-gray-600">Sign in to your Health Alert System account</p>
+            <h2 class="text-4xl font-bold text-gray-900 mb-3">Welcome Back</h2>
+            <p class="text-gray-600 text-lg">Sign in to your Health Alert System account</p>
         </div>
 
         <!-- Login Form -->
-        <div class="bg-white rounded-xl shadow-lg p-8 animate-fade-in-up stagger-1">
+        <div class="bg-white rounded-2xl shadow-xl p-8 animate-fade-in-up stagger-1 border border-gray-100">
             <?php if ($error): ?>
-                <?php echo render_alert($error, 'danger'); ?>
+                <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-6 rounded-r-lg animate-shake">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <p class="text-sm text-red-700 font-medium"><?php echo htmlspecialchars($error); ?></p>
+                        </div>
+                    </div>
+                </div>
             <?php endif; ?>
             
-            <form method="POST" class="space-y-6">
-                <?php 
-                echo render_form_input(
-                    'email', 
-                    'Email Address', 
-                    'email', 
-                    $email, 
-                    true, 
-                    '', 
-                    ['placeholder' => 'Enter your email']
-                );
+            <form method="POST" class="space-y-6" id="loginForm">
+                <!-- Email Field -->
+                <div class="form-group">
+                    <div class="relative">
+                        <input type="email" 
+                               id="email" 
+                               name="email" 
+                               value=""
+                               placeholder=" "
+                               required
+                               class="form-input peer w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all duration-300 text-gray-900 placeholder-transparent">
+                        <label for="email" 
+                               class="form-label absolute left-4 -top-2.5 bg-white px-2 text-sm text-gray-600 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:left-4 peer-focus:-top-2.5 peer-focus:left-4 peer-focus:text-sm peer-focus:text-primary-600 peer-focus:font-medium">
+                            Email Address
+                        </label>
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                          
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="form-group">
+                    <div class="relative">
+                        <input type="password" 
+                               id="password" 
+                               name="password" 
+                               placeholder=" "
+                               required
+                               class="form-input peer w-full px-4 py-3 border-2 border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:border-primary-500 focus:ring-4 focus:ring-primary-100 transition-all duration-300 text-gray-900 placeholder-transparent">
+                        <label for="password" 
+                               class="form-label absolute left-4 -top-2.5 bg-white px-2 text-sm text-gray-600 transition-all peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-placeholder-shown:top-3 peer-placeholder-shown:left-4 peer-focus:-top-2.5 peer-focus:left-4 peer-focus:text-sm peer-focus:text-primary-600 peer-focus:font-medium">
+                            Password
+                        </label>
+                        <button type="button" 
+                                id="togglePassword"
+                                class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg id="eyeIcon" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
                 
-                echo render_form_input(
-                    'password', 
-                    'Password', 
-                    'password', 
-                    '', 
-                    true, 
-                    '', 
-                    ['placeholder' => 'Enter your password']
-                );
-                ?>
+                <!-- Remember Me & Forgot Password -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <input id="remember-me" 
+                               name="remember-me" 
+                               type="checkbox" 
+                               class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded transition-colors">
+                        <label for="remember-me" class="ml-2 block text-sm text-gray-700 hover:text-gray-900 cursor-pointer">
+                            Remember me
+                        </label>
+                    </div>
+                    <div class="text-sm">
+                        <a href="#" class="font-medium text-primary-600 hover:text-primary-500 transition-colors hover-underline">
+                            Forgot password?
+                        </a>
+                    </div>
+                </div>
                 
-                <div class="pt-4">
-                    <?php echo render_button('Sign In', 'submit', 'primary', 'lg', false, ['class' => 'w-full']); ?>
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button type="submit" 
+                            id="submitBtn"
+                            class="btn-animate btn-ripple w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl text-sm font-medium text-white bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-4 focus:ring-primary-200 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                        <span id="submitText">Sign In</span>
+                        <svg id="loadingSpinner" class="hidden animate-spin ml-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </button>
                 </div>
             </form>
             
+            <!-- Register Link -->
             <div class="mt-6 text-center">
                 <p class="text-sm text-gray-600">
                     Don't have an account? 
                     <a href="register.php" class="font-medium text-primary-600 hover:text-primary-500 transition-colors hover-underline">
-                        Register here
+                        Create one now
                     </a>
                 </p>
             </div>
         </div>
 
-        <!-- Demo Accounts -->
-        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 animate-fade-in-up stagger-2">
-            <h3 class="text-sm font-medium text-gray-900 mb-4 flex items-center">
-                <div class="w-5 h-5 bg-blue-200 rounded-full flex items-center justify-center mr-2">
-                    <span class="text-blue-800 text-xs">ℹ️</span>
-                </div>
-                Demo Accounts
-            </h3>
-            <div class="grid grid-cols-1 gap-3 text-xs">
-                <div class="bg-white rounded-lg p-3 shadow-sm">
-                    <div class="font-medium text-gray-900">Admin</div>
-                    <div class="text-gray-600">admin@healthalert.com / admin123</div>
-                </div>
-                <div class="bg-white rounded-lg p-3 shadow-sm">
-                    <div class="font-medium text-gray-900">Doctor</div>
-                    <div class="text-gray-600">sarah.johnson@hospital.com / doctor123</div>
-                </div>
-                <div class="bg-white rounded-lg p-3 shadow-sm">
-                    <div class="font-medium text-gray-900">Patient</div>
-                    <div class="text-gray-600">john.smith@email.com / patient123</div>
-                </div>
-            </div>
-        </div>
 
-        <!-- Features -->
-        <div class="text-center animate-fade-in-up stagger-3">
-            <div class="grid grid-cols-3 gap-4 text-xs text-gray-500">
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                        </svg>
-                    </div>
-                    <span>Secure</span>
-                </div>
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                    <span>Fast</span>
-                </div>
-                <div class="flex flex-col items-center">
-                    <div class="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center mb-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
-                        </svg>
-                    </div>
-                    <span>Reliable</span>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Add focus animations to form inputs
-    const inputs = document.querySelectorAll('input');
-    inputs.forEach(input => {
-        input.addEventListener('focus', function() {
-            this.parentElement.classList.add('animate-scale-in');
-        });
+    // Password toggle functionality
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const eyeIcon = document.getElementById('eyeIcon');
+    
+    togglePassword.addEventListener('click', function() {
+        const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+        passwordInput.setAttribute('type', type);
         
-        input.addEventListener('blur', function() {
-            this.parentElement.classList.remove('animate-scale-in');
-        });
+        // Toggle eye icon
+        if (type === 'text') {
+            eyeIcon.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+            `;
+        } else {
+            eyeIcon.innerHTML = `
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            `;
+        }
     });
     
-    // Demo account quick fill
-    const demoAccounts = document.querySelectorAll('.bg-white.rounded-lg.p-3');
+    // Demo account auto-fill functionality
+    const demoAccounts = document.querySelectorAll('.demo-account');
     demoAccounts.forEach(account => {
         account.addEventListener('click', function() {
-            const text = this.querySelector('.text-gray-600').textContent;
-            const [email, password] = text.split(' / ');
+            const email = this.getAttribute('data-email');
+            const password = this.getAttribute('data-password');
             
             document.getElementById('email').value = email;
             document.getElementById('password').value = password;
@@ -210,10 +229,53 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add visual feedback
             this.classList.add('animate-pulse');
             setTimeout(() => this.classList.remove('animate-pulse'), 1000);
+            
+            // Focus on submit button
+            document.getElementById('submitBtn').focus();
+        });
+    });
+    
+    // Form submission with loading state
+    const form = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const submitText = document.getElementById('submitText');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    
+    form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitText.textContent = 'Signing In...';
+        loadingSpinner.classList.remove('hidden');
+        submitBtn.classList.add('opacity-75');
+    });
+    
+    // Input validation feedback
+    const inputs = document.querySelectorAll('input[type="email"], input[type="password"]');
+    inputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.value && !this.checkValidity()) {
+                this.classList.add('border-red-300', 'animate-shake');
+                setTimeout(() => this.classList.remove('animate-shake'), 500);
+            } else if (this.value && this.checkValidity()) {
+                this.classList.add('border-green-300');
+                this.classList.remove('border-red-300');
+            }
         });
         
-        // Add hover effect
-        account.classList.add('cursor-pointer', 'hover:shadow-md', 'transition-shadow');
+        input.addEventListener('input', function() {
+            this.classList.remove('border-red-300', 'border-green-300');
+        });
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // Alt + 1, 2, 3 for demo accounts
+        if (e.altKey && e.key >= '1' && e.key <= '3') {
+            e.preventDefault();
+            const accountIndex = parseInt(e.key) - 1;
+            if (demoAccounts[accountIndex]) {
+                demoAccounts[accountIndex].click();
+            }
+        }
     });
 });
 </script>

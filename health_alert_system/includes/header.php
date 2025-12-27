@@ -10,8 +10,15 @@ require_once __DIR__ . '/components.php';
     <title><?php echo isset($page_title) ? htmlspecialchars($page_title) . ' - ' : ''; ?>Health Alert System</title>
     <meta name="description" content="Smart Health Monitoring System for patients, doctors, and administrators">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="../assets/css/animations.css">
+    <link rel="stylesheet" href="<?php echo isset($_SESSION['user_id']) ? '../' : ''; ?>assets/css/animations.css">
+    <script src="<?php echo isset($_SESSION['user_id']) ? '../' : ''; ?>assets/js/interactions.js"></script>
     <script>
+        // Mobile menu toggle function
+        function toggleMobileMenu() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            mobileMenu.classList.toggle('hidden');
+        }
+        
         tailwind.config = {
             theme: {
                 extend: {
@@ -209,10 +216,10 @@ require_once __DIR__ . '/components.php';
                 <?php else: ?>
                 <!-- Guest Navigation -->
                 <div class="flex items-center space-x-4">
-                    <a href="../index.php" class="text-gray-600 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                    <a href="<?php echo isset($_SESSION['user_id']) ? '../' : ''; ?>index.php" class="text-gray-600 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                         Login
                     </a>
-                    <a href="../register.php" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring">
+                    <a href="<?php echo isset($_SESSION['user_id']) ? '../' : ''; ?>register.php" class="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors focus-ring">
                         Register
                     </a>
                 </div>
