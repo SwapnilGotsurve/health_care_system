@@ -162,33 +162,33 @@ include '../includes/header.php';
                     Quick Templates (Click to use)
                 </label>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button type="button" onclick="useTemplate('Please remember to take your medication as prescribed and record your daily health readings.')" 
-                            class="text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-md text-sm text-blue-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-blue-50 hover:bg-blue-100 rounded-md text-sm text-blue-800 transition-colors"
+                            data-template="Please remember to take your medication as prescribed and record your daily health readings.">
                         📋 Medication Reminder
                     </button>
                     
-                    <button type="button" onclick="useTemplate('Your recent blood pressure readings are concerning. Please schedule a follow-up appointment.')" 
-                            class="text-left p-3 bg-yellow-50 hover:bg-yellow-100 rounded-md text-sm text-yellow-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-yellow-50 hover:bg-yellow-100 rounded-md text-sm text-yellow-800 transition-colors"
+                            data-template="Your recent blood pressure readings are concerning. Please schedule a follow-up appointment.">
                         ⚠️ Follow-up Required
                     </button>
                     
-                    <button type="button" onclick="useTemplate('Great job on maintaining healthy readings! Keep up the excellent work with your health monitoring.')" 
-                            class="text-left p-3 bg-green-50 hover:bg-green-100 rounded-md text-sm text-green-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-green-50 hover:bg-green-100 rounded-md text-sm text-green-800 transition-colors"
+                            data-template="Great job on maintaining healthy readings! Keep up the excellent work with your health monitoring.">
                         ✅ Positive Feedback
                     </button>
                     
-                    <button type="button" onclick="useTemplate('Please monitor your blood sugar levels more closely and reduce sugar intake as discussed.')" 
-                            class="text-left p-3 bg-orange-50 hover:bg-orange-100 rounded-md text-sm text-orange-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-orange-50 hover:bg-orange-100 rounded-md text-sm text-orange-800 transition-colors"
+                            data-template="Please monitor your blood sugar levels more closely and reduce sugar intake as discussed.">
                         🍎 Dietary Advice
                     </button>
                     
-                    <button type="button" onclick="useTemplate('I noticed you haven\\'t recorded any health data recently. Please update your readings when possible.')" 
-                            class="text-left p-3 bg-purple-50 hover:bg-purple-100 rounded-md text-sm text-purple-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-purple-50 hover:bg-purple-100 rounded-md text-sm text-purple-800 transition-colors"
+                            data-template="I noticed you haven't recorded any health data recently. Please update your readings when possible.">
                         📊 Data Reminder
                     </button>
                     
-                    <button type="button" onclick="useTemplate('Please contact our office to schedule your next appointment. Call (555) 123-4567.')" 
-                            class="text-left p-3 bg-indigo-50 hover:bg-indigo-100 rounded-md text-sm text-indigo-800 transition-colors">
+                    <button type="button" class="template-btn text-left p-3 bg-indigo-50 hover:bg-indigo-100 rounded-md text-sm text-indigo-800 transition-colors"
+                            data-template="Please contact our office to schedule your next appointment. Call (555) 123-4567.">
                         📞 Appointment Request
                     </button>
                 </div>
@@ -316,8 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (count > 900) {
             charCount.classList.add('text-red-500');
+            charCount.classList.remove('text-yellow-500');
         } else if (count > 800) {
             charCount.classList.add('text-yellow-500');
+            charCount.classList.remove('text-red-500');
         } else {
             charCount.classList.remove('text-red-500', 'text-yellow-500');
         }
@@ -325,18 +327,45 @@ document.addEventListener('DOMContentLoaded', function() {
     
     messageTextarea.addEventListener('input', updateCharCount);
     updateCharCount(); // Initial count
+    
+    // Template button event listeners
+    const templateButtons = document.querySelectorAll('.template-btn');
+    templateButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const template = this.getAttribute('data-template');
+            useTemplate(template);
+        });
+    });
 });
 
 // Template functions
 function useTemplate(template) {
-    document.getElementById('message').value = template;
-    document.getElementById('char-count').textContent = template.length;
+    const messageTextarea = document.getElementById('message');
+    const charCount = document.getElementById('char-count');
+    
+    messageTextarea.value = template;
+    charCount.textContent = template.length;
+    
+    // Update character count styling
+    if (template.length > 900) {
+        charCount.classList.add('text-red-500');
+        charCount.classList.remove('text-yellow-500');
+    } else if (template.length > 800) {
+        charCount.classList.add('text-yellow-500');
+        charCount.classList.remove('text-red-500');
+    } else {
+        charCount.classList.remove('text-red-500', 'text-yellow-500');
+    }
+    
+    // Focus on textarea after template insertion
+    messageTextarea.focus();
 }
 
 function clearForm() {
     document.getElementById('patient_id').value = '';
     document.getElementById('message').value = '';
     document.getElementById('char-count').textContent = '0';
+    document.getElementById('char-count').classList.remove('text-red-500', 'text-yellow-500');
 }
 
 // Auto-save draft (optional enhancement)
